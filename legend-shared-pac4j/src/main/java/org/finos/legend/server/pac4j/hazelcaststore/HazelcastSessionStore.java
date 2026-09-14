@@ -41,7 +41,7 @@ public class HazelcastSessionStore extends HttpSessionStore
     private String sessionTokenName;
 
     public HazelcastSessionStore(String hazelcastConfigFilePath,
-                                 Map<Class<? extends WebContext>, SessionStore<? extends WebContext>> underlyingStores, String sessionTokenName)
+                                 Map<Class<? extends WebContext>, SessionStore> underlyingStores, String sessionTokenName)
     {
         super(underlyingStores);
         this.sessionTokenName = sessionTokenName;
@@ -91,10 +91,10 @@ public class HazelcastSessionStore extends HttpSessionStore
     }
 
     @Override
-    public String getOrCreateSessionId(WebContext context)
+    public Optional<String> getSessionId(WebContext context, boolean createSession)
     {
         getOrCreateSsoKey(context);
-        return super.getOrCreateSessionId(context);
+        return super.getSessionId(context, createSession);
     }
 
     @Override

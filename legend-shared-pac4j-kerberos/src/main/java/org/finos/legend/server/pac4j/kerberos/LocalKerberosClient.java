@@ -15,11 +15,12 @@
 package org.finos.legend.server.pac4j.kerberos;
 
 import org.pac4j.core.client.DirectClient;
-import org.pac4j.core.context.JEEContext;
+import org.pac4j.jee.context.JEEContext;
 import org.pac4j.core.context.WebContext;
+import org.pac4j.core.context.session.SessionStore;
 import org.pac4j.core.exception.CredentialsException;
 
-public class LocalKerberosClient extends DirectClient<LocalCredentials>
+public class LocalKerberosClient extends DirectClient
 {
   private static final String X_FORWARDED_FOR_HEADER = "x-forwarded-for";
 
@@ -29,10 +30,10 @@ public class LocalKerberosClient extends DirectClient<LocalCredentials>
   }
 
   @Override
-  protected void clientInit()
+  protected void internalInit(boolean forceReinit)
   {
     setAuthenticator(
-        (credentials, context) ->
+        (credentials, context, sessionStore) ->
         {
           JEEContext jeeContext = (JEEContext) context;
           javax.servlet.http.HttpServletRequest request = jeeContext.getNativeRequest();
@@ -41,7 +42,7 @@ public class LocalKerberosClient extends DirectClient<LocalCredentials>
             throw new CredentialsException("LocalKerberosClient only works with local requests");
           }
         });
-    setCredentialsExtractor(context -> java.util.Optional.of(LocalCredentials.INSTANCE));
-    setProfileCreator((credentials, context) -> java.util.Optional.of(new KerberosProfile(credentials)));
+    setCredentialsExtractor((context, sessionStore) -> java.util.Optional.of(LocalCredentials.INSTANCE));
+    setProfileCreator((credentials, context, sessionStore) -> java.util.Optional.of(new KerberosProfile((LocalCredentials) credentials)));
   }
 }

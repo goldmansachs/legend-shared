@@ -14,19 +14,16 @@
 
 package org.finos.legend.server.pac4j;
 
-import com.codahale.metrics.MetricRegistry;
-import com.codahale.metrics.health.HealthCheckRegistry;
 import com.google.common.collect.ImmutableList;
-import io.dropwizard.Configuration;
-import io.dropwizard.setup.Environment;
+import io.dropwizard.core.Configuration;
+import io.dropwizard.core.setup.Environment;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletHandler;
 import org.junit.Test;
+import org.pac4j.core.client.Client;
 import org.pac4j.core.client.finder.ClientFinder;
 import org.pac4j.core.config.Config;
 import org.pac4j.core.engine.DefaultSecurityLogic;
-import org.pac4j.core.engine.decision.AlwaysUseSessionProfileStorageDecision;
-import org.pac4j.core.engine.decision.ProfileStorageDecision;
 import org.pac4j.dropwizard.Pac4jFactory;
 import org.pac4j.jee.filter.SecurityFilter;
 
@@ -41,7 +38,7 @@ public class LegendPac4JBundleTest
   {
     LegendPac4jConfiguration config = new LegendPac4jConfiguration();
     config.setCallbackPrefix("/test");
-    config.setClients(ImmutableList.of(new TestClient()));
+    config.setClients(ImmutableList.<Client>of(new TestClient()));
     LegendPac4jBundle<Configuration> bundle = new LegendPac4jBundle<>(c -> config);
     Pac4jFactory factory = bundle.getPac4jFactory(new Configuration());
     assertEquals("/test/callback", factory.getCallbackUrl());
@@ -55,12 +52,12 @@ public class LegendPac4JBundleTest
   {
     LegendPac4jConfiguration config = new LegendPac4jConfiguration();
     config.setCallbackPrefix("/test");
-    config.setClients(ImmutableList.of(new TestClient(), new SecondTestClient()));
+    config.setClients(ImmutableList.of((Client) new TestClient(), new SecondTestClient()));
     config.setDefaultClient(Collections.singletonList("SecondTestClient"));
     LegendPac4jBundle<Configuration> bundle = new LegendPac4jBundle<>(c -> config);
     Pac4jFactory factory = bundle.getPac4jFactory(new Configuration());
     Config builtConfig = factory.build();
-    Environment e = new Environment("serverEnv", null, null, new MetricRegistry(), null, new HealthCheckRegistry());
+    Environment e = new Environment("serverEnv");
     bundle.run(new Configuration(),e);
     assertEquals("/test/callback", factory.getCallbackUrl());
     assertEquals(config.getClients(), factory.getClients());
@@ -74,7 +71,7 @@ public class LegendPac4JBundleTest
     s.initialize();
     ClientFinder finder = ((DefaultSecurityLogic)((SecurityFilter)s.getFilters()[0].getFilter()).getSecurityLogic()).getClientFinder();
     assertTrue(finder instanceof LegendClientFinder);
-    ProfileStorageDecision storageDecision = ((DefaultSecurityLogic)((SecurityFilter)s.getFilters()[0].getFilter()).getSecurityLogic()).getProfileStorageDecision();
+    LegendUserProfileStorageDecision storageDecision = ((LegendSecurityLogic)((SecurityFilter)s.getFilters()[0].getFilter()).getSecurityLogic()).getProfileStorageDecision();
     assertTrue(storageDecision instanceof LegendUserProfileStorageDecision);
   }
 
@@ -83,13 +80,13 @@ public class LegendPac4JBundleTest
   {
     LegendPac4jConfiguration config = new LegendPac4jConfiguration();
     config.setCallbackPrefix("/test");
-    config.setClients(ImmutableList.of(new TestClient(), new SecondTestClient()));
+    config.setClients(ImmutableList.of((Client) new TestClient(), new SecondTestClient()));
     config.setDefaultClient(Collections.singletonList("SecondTestClient"));
     config.setAlwaysUseSessionStorage(true);
     LegendPac4jBundle<Configuration> bundle = new LegendPac4jBundle<>(c -> config);
     Pac4jFactory factory = bundle.getPac4jFactory(new Configuration());
     Config builtConfig = factory.build();
-    Environment e = new Environment("serverEnv", null, null, new MetricRegistry(), null, new HealthCheckRegistry());
+    Environment e = new Environment("serverEnv");
     bundle.run(new Configuration(),e);
     assertEquals("/test/callback", factory.getCallbackUrl());
     assertEquals(config.getClients(), factory.getClients());
@@ -103,7 +100,7 @@ public class LegendPac4JBundleTest
     s.initialize();
     ClientFinder finder = ((DefaultSecurityLogic)((SecurityFilter)s.getFilters()[0].getFilter()).getSecurityLogic()).getClientFinder();
     assertTrue(finder instanceof LegendClientFinder);
-    ProfileStorageDecision storageDecision = ((DefaultSecurityLogic)((SecurityFilter)s.getFilters()[0].getFilter()).getSecurityLogic()).getProfileStorageDecision();
+    LegendUserProfileStorageDecision storageDecision = ((LegendSecurityLogic)((SecurityFilter)s.getFilters()[0].getFilter()).getSecurityLogic()).getProfileStorageDecision();
     assertTrue(storageDecision instanceof AlwaysUseSessionProfileStorageDecision);
   }
 

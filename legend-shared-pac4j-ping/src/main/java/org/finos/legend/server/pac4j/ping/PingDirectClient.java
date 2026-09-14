@@ -57,7 +57,7 @@ public class PingDirectClient extends DirectBearerAuthClient
     private Map<String, String> customParams;
 
     @Override
-    protected void clientInit()
+    protected void internalInit(boolean forceReinit)
     {
         OidcConfiguration config = new OidcConfiguration();
         config.setClientId(clientId);
@@ -82,7 +82,7 @@ public class PingDirectClient extends DirectBearerAuthClient
         config.setScope(scope);
 
         setAuthenticator(new UserInfoOidcAuthenticator(config));
-        setProfileCreator(new AuthenticatorProfileCreator<>());
-        super.clientInit();
+        setProfileCreator(AuthenticatorProfileCreator.INSTANCE);
+        super.internalInit(forceReinit);
     }
 }

@@ -25,7 +25,6 @@ import org.pac4j.core.client.Client;
 import org.pac4j.core.client.Clients;
 import org.pac4j.core.client.finder.DefaultSecurityClientFinder;
 import org.pac4j.core.context.WebContext;
-import org.pac4j.core.credentials.Credentials;
 import org.pac4j.core.exception.TechnicalException;
 import org.pac4j.core.util.CommonHelper;
 import org.pac4j.core.util.Pac4jConstants;
@@ -39,7 +38,7 @@ public class LegendClientFinder extends DefaultSecurityClientFinder
    private static final Logger logger = LoggerFactory.getLogger(DefaultSecurityClientFinder.class);
    public static final String CLIENT_TO_EXCLUDE = "ClientToExclude";
 
-  String clientNameParameter = Pac4jConstants.DEFAULT_CLIENT_NAME_PARAMETER;
+  String clientNameParameter = Pac4jConstants.DEFAULT_FORCE_CLIENT_PARAMETER;
   List<String> defaultClients;
 
   public LegendClientFinder(List<String> defaultClients)
@@ -49,9 +48,9 @@ public class LegendClientFinder extends DefaultSecurityClientFinder
   }
 
   @Override
-  public List<Client<? extends Credentials>> find(Clients clients, WebContext context, String clientNames)
+  public List<Client> find(Clients clients, WebContext context, String clientNames)
   {
-    List<Client<? extends Credentials>> result = new ArrayList<>();
+    List<Client> result = new ArrayList<>();
     String securityClientNames = clientNames;
     logger.debug("Provided clientNames: {}", clientNames);
     if (clientNames == null)
@@ -97,7 +96,7 @@ public class LegendClientFinder extends DefaultSecurityClientFinder
     return result;
   }
 
-  public List<Client<? extends Credentials>> findUtil(Clients clients, List<String> names, List<String> toFind, List<String> clientsToExclude)
+  public List<Client> findUtil(Clients clients, List<String> names, List<String> toFind, List<String> clientsToExclude)
   {
     return toFind.stream()
             .filter(requested -> clientsToExclude.stream().noneMatch(excluded -> CommonHelper.areEqualsIgnoreCaseAndTrim(excluded, requested)))
@@ -105,7 +104,6 @@ public class LegendClientFinder extends DefaultSecurityClientFinder
                     .filter(allowed -> CommonHelper.areEqualsIgnoreCaseAndTrim(allowed, requested))
                     .findFirst()
                     .flatMap(clients::findClient)
-                    .map(client -> (Client<? extends Credentials>) client)
                     .orElseThrow(() -> new TechnicalException("Client not found: " + requested)))
             .collect(Collectors.toList());
   }

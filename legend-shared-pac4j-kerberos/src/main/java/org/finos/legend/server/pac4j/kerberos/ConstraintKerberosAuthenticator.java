@@ -22,8 +22,10 @@ import org.ietf.jgss.GSSException;
 import org.ietf.jgss.GSSManager;
 import org.ietf.jgss.GSSName;
 import org.ietf.jgss.Oid;
-import org.pac4j.core.context.JEEContext;
+import org.pac4j.jee.context.JEEContext;
 import org.pac4j.core.context.WebContext;
+import org.pac4j.core.context.session.SessionStore;
+import org.pac4j.core.credentials.Credentials;
 import org.pac4j.core.credentials.authenticator.Authenticator;
 import org.pac4j.core.exception.BadCredentialsException;
 import org.pac4j.core.exception.CredentialsException;
@@ -40,7 +42,7 @@ import javax.security.auth.login.Configuration;
 import javax.security.auth.login.LoginContext;
 import javax.security.auth.login.LoginException;
 
-public class ConstraintKerberosAuthenticator implements Authenticator<KerberosCredentials>
+public class ConstraintKerberosAuthenticator implements Authenticator
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(ConstraintKerberosAuthenticator.class);
     private final String servicePrincipal;
@@ -61,9 +63,10 @@ public class ConstraintKerberosAuthenticator implements Authenticator<KerberosCr
     }
 
     @Override
-    public void validate(KerberosCredentials userCredentials, WebContext webContext)
+    public void validate(Credentials rawCredentials, WebContext webContext, SessionStore sessionStore)
     {
-        try
+        KerberosCredentials userCredentials = (KerberosCredentials) rawCredentials;
+                try
         {
             GSSManager manager = GSSManager.getInstance();
 

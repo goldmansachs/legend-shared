@@ -82,7 +82,7 @@ public class ConstraintKerberosAuthenticatorTest
 
             byte[] spnegoToken = new byte[] {1, 2, 3};
             KerberosCredentials credentials = new KerberosCredentials(spnegoToken);
-            delegationKerberosAuth.validate(credentials, mokcedWebContext);
+            delegationKerberosAuth.validate(credentials, mokcedWebContext, null);
 
             assertNotNull(credentials.getUserProfile());
             assertTrue(credentials.getUserProfile() instanceof KerberosProfile);
@@ -128,7 +128,7 @@ public class ConstraintKerberosAuthenticatorTest
 
             byte[] spnegoToken = new byte[] {1, 2, 3};
             KerberosCredentials credentials = new KerberosCredentials(spnegoToken);
-            delegationKerberosAuth.validate(credentials, mokcedWebContext);
+            delegationKerberosAuth.validate(credentials, mokcedWebContext, null);
 
             assertNotNull(credentials.getUserProfile());
             assertTrue(credentials.getUserProfile() instanceof KerberosProfile);

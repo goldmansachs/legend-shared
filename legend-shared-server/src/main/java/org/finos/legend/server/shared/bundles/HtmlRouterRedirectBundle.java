@@ -14,9 +14,10 @@
 
 package org.finos.legend.server.shared.bundles;
 
-import io.dropwizard.Bundle;
-import io.dropwizard.setup.Bootstrap;
-import io.dropwizard.setup.Environment;
+import io.dropwizard.core.Configuration;
+import io.dropwizard.core.ConfiguredBundle;
+import io.dropwizard.core.setup.Bootstrap;
+import io.dropwizard.core.setup.Environment;
 import java.io.IOException;
 import java.util.EnumSet;
 import java.util.List;
@@ -30,7 +31,7 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 
 @SuppressWarnings("unused")
-public class HtmlRouterRedirectBundle implements Bundle
+public class HtmlRouterRedirectBundle implements ConfiguredBundle<Configuration>
 {
 
   private final String uiPath;
@@ -50,7 +51,7 @@ public class HtmlRouterRedirectBundle implements Bundle
   }
 
   @Override
-  public void run(Environment environment)
+  public void run(Configuration configuration, Environment environment)
   {
     environment
         .servlets()

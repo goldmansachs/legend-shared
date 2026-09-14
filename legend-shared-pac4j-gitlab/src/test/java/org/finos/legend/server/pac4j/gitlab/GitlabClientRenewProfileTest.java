@@ -46,6 +46,9 @@ import static org.mockito.Mockito.when;
 
 public class GitlabClientRenewProfileTest
 {
+    /** pac4j 5 passes the SessionStore explicitly rather than hanging it off the WebContext. */
+    private SessionStore mockSessionStore;
+
     private MockWebServer mockServer;
     private String discoveryUrl;
 
@@ -82,7 +85,7 @@ public class GitlabClientRenewProfileTest
         WebContext mockContext = createMockWebContext();
 
         TechnicalException e = assertThrows(TechnicalException.class,
-                () -> client.renewUserProfile(expiredProfile, mockContext));
+                () -> client.renewUserProfile(expiredProfile, mockContext, this.mockSessionStore));
         assertFalse("init() was not called before accessing getConfiguration()",
                 e.getMessage().contains("configuration cannot be null"));
         assertNotNull("Configuration should be non-null after renewUserProfile() triggers init()",
@@ -109,7 +112,7 @@ public class GitlabClientRenewProfileTest
         WebContext mockContext = createMockWebContext();
 
         TechnicalException e = assertThrows(TechnicalException.class,
-                () -> client.renewUserProfile(expiredProfile, mockContext));
+                () -> client.renewUserProfile(expiredProfile, mockContext, this.mockSessionStore));
         assertFalse("Should not get 'configuration cannot be null' on an initialized client",
                 e.getMessage().contains("configuration cannot be null"));
         assertNotNull("Configuration should still be non-null", client.getConfiguration());
@@ -144,10 +147,9 @@ public class GitlabClientRenewProfileTest
 
         WebContext mockContext = mock(WebContext.class);
         SessionStore sessionStore = mock(SessionStore.class);
-        when(mockContext.getSessionStore()).thenReturn(sessionStore);
         when(sessionStore.get(mockContext, "pac4jUserProfiles")).thenReturn(Optional.of(sessionProfiles));
 
-        Optional<UserProfile> result = client.renewUserProfile(expiredProfile, mockContext);
+        Optional<UserProfile> result = client.renewUserProfile(expiredProfile, mockContext, sessionStore);
 
         assertTrue("Should return the renewed profile from session", result.isPresent());
         assertEquals("new-access-token", ((OidcProfile) result.get()).getAccessToken().getValue());
@@ -174,11 +176,10 @@ public class GitlabClientRenewProfileTest
 
         WebContext mockContext = mock(WebContext.class);
         SessionStore sessionStore = mock(SessionStore.class);
-        when(mockContext.getSessionStore()).thenReturn(sessionStore);
         when(sessionStore.get(mockContext, "pac4jUserProfiles")).thenReturn(Optional.of(sessionProfiles));
 
         TechnicalException e = assertThrows(TechnicalException.class,
-                () -> client.renewUserProfile(expiredProfile, mockContext));
+                () -> client.renewUserProfile(expiredProfile, mockContext, sessionStore));
         assertTrue("Should be invalid_grant error",
                 e.getMessage().contains("invalid_grant"));
     }
@@ -198,9 +199,8 @@ public class GitlabClientRenewProfileTest
     private WebContext createMockWebContext()
     {
         WebContext context = mock(WebContext.class);
-        SessionStore sessionStore = mock(SessionStore.class);
-        when(context.getSessionStore()).thenReturn(sessionStore);
-        when(sessionStore.get(any(), anyString())).thenReturn(Optional.empty());
+        this.mockSessionStore = mock(SessionStore.class);
+        when(this.mockSessionStore.get(any(), anyString())).thenReturn(Optional.empty());
         return context;
     }
 

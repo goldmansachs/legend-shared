@@ -97,7 +97,7 @@ public class LocalAssetServlet extends AssetServlet
     final String absoluteRequestedResourcePath = getPath(req);
     try
     {
-      URL requestedResourceUrl = getResourceUrl(absoluteRequestedResourcePath);
+      URL requestedResourceUrl = getResourceURL(absoluteRequestedResourcePath);
       try
       {
         if (ResourceURL.isDirectory(requestedResourceUrl) && !absoluteRequestedResourcePath
@@ -144,7 +144,7 @@ public class LocalAssetServlet extends AssetServlet
   }
 
   @Override
-  protected URL getResourceUrl(String requestedResourcePath)
+  protected URL getResourceURL(String requestedResourcePath)
   {
     final String absoluteRequestedResourcePath =
         requestedResourcePath.startsWith("/") ? requestedResourcePath : "/" + requestedResourcePath;
@@ -162,10 +162,10 @@ public class LocalAssetServlet extends AssetServlet
       }
     } else if (Strings.isNullOrEmpty(this.resourcePath))
     {
-      return super.getResourceUrl(absoluteRequestedResourcePath.substring(1));
+      return super.getResourceURL(absoluteRequestedResourcePath.substring(1));
     } else
     {
-      return super.getResourceUrl(this.resourcePath + absoluteRequestedResourcePath);
+      return super.getResourceURL(this.resourcePath + absoluteRequestedResourcePath);
     }
   }
 

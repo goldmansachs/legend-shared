@@ -15,11 +15,13 @@
 package org.finos.legend.server.pac4j;
 
 import org.finos.legend.server.pac4j.internal.HttpSessionStore;
-import org.pac4j.core.context.JEEContext;
+import org.pac4j.jee.context.JEEContext;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 import javax.servlet.http.Cookie;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import static org.junit.Assert.assertEquals;
@@ -28,12 +30,38 @@ import static org.junit.Assert.assertTrue;
 
 public class SessionStoreTestUtil {
 
+    /**
+     * pac4j 5's JEEContext.addResponseCookie writes a raw Set-Cookie header rather than calling
+     * HttpServletResponse.addCookie, so MockHttpServletResponse.getCookies() no longer sees the
+     * cookies the session stores emit. Parse them back out of the headers instead.
+     */
+    public static Cookie[] responseCookies(MockHttpServletResponse response)
+    {
+        List<Cookie> cookies = new ArrayList<>();
+        for (String header : response.getHeaders("Set-Cookie"))
+        {
+            String[] attributes = header.split(";");
+            String[] nameAndValue = attributes[0].split("=", 2);
+            Cookie cookie = new Cookie(nameAndValue[0].trim(), nameAndValue.length > 1 ? nameAndValue[1].trim() : "");
+            for (int i = 1; i < attributes.length; i++)
+            {
+                String[] attribute = attributes[i].split("=", 2);
+                if ("Max-Age".equalsIgnoreCase(attribute[0].trim()) && attribute.length > 1)
+                {
+                    cookie.setMaxAge(Integer.parseInt(attribute[1].trim()));
+                }
+            }
+            cookies.add(cookie);
+        }
+        return cookies.toArray(new Cookie[0]);
+    }
+
     public static void testSetCreatesCookie(HttpSessionStore store)
     {
         MockHttpServletResponse response = new MockHttpServletResponse();
         JEEContext requestContext = new JEEContext(new MockHttpServletRequest(), response);
         store.set(requestContext, "testKey", "testValue");
-        Cookie[] cookies = response.getCookies();
+        Cookie[] cookies = responseCookies(response);
         assertEquals(1, cookies.length);
         Cookie cookie = cookies[0];
         assertEquals("LegendSSOTest", cookie.getName());
@@ -50,7 +78,7 @@ public class SessionStoreTestUtil {
         store.set(requestContext, "testKey2", "testValue");
         store.set(requestContext, "testKey3", "testValue");
         store.set(requestContext, "testKey4", "testValue");
-        Cookie[] cookies = response.getCookies();
+        Cookie[] cookies = responseCookies(response);
         assertEquals(1, cookies.length);
     }
 
@@ -83,7 +111,7 @@ public class SessionStoreTestUtil {
 
         // Copy the cookie to the new request
         MockHttpServletRequest newRequest = new MockHttpServletRequest();
-        newRequest.setCookies(response.getCookies());
+        newRequest.setCookies(responseCookies(response));
         MockHttpServletResponse newResponse = new MockHttpServletResponse();
         requestContext = new JEEContext(newRequest, newResponse);
 
@@ -98,7 +126,7 @@ public class SessionStoreTestUtil {
         store.set(requestContext, "testKey", "testValue");
 
         assertEquals("testValue", store.get(requestContext, "testKey").get());
-        Cookie[] initialResponseCookies = response.getCookies();
+        Cookie[] initialResponseCookies = responseCookies(response);
         // Copy the session to the new request but not the cookie. This should force creation of a new cookie;
         MockHttpServletRequest newRequest = new MockHttpServletRequest();
         newRequest.setSession(request.getSession());
@@ -106,7 +134,7 @@ public class SessionStoreTestUtil {
         requestContext = new JEEContext(newRequest, newResponse);
 
         assertEquals("testValue", store.get(requestContext, "testKey").get());
-        Cookie[] secondaryResponseCookies = newResponse.getCookies();
+        Cookie[] secondaryResponseCookies = responseCookies(newResponse);
         assertNotEquals(secondaryResponseCookies, initialResponseCookies);
     }
 }

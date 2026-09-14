@@ -15,9 +15,10 @@
 package org.finos.legend.server.shared.bundles;
 
 import com.google.common.collect.ImmutableList;
-import io.dropwizard.Bundle;
-import io.dropwizard.setup.Bootstrap;
-import io.dropwizard.setup.Environment;
+import io.dropwizard.core.Configuration;
+import io.dropwizard.core.ConfiguredBundle;
+import io.dropwizard.core.setup.Bootstrap;
+import io.dropwizard.core.setup.Environment;
 import io.opentracing.Span;
 import io.opentracing.contrib.jaxrs2.internal.CastUtils;
 import io.opentracing.contrib.jaxrs2.internal.SpanWrapper;
@@ -50,7 +51,7 @@ import org.finos.legend.opentracing.StandardSpanDecorator;
 import static io.opentracing.contrib.jaxrs2.internal.SpanWrapper.PROPERTY_NAME;
 
 @SuppressWarnings("unused")
-public class OpenTracingBundle implements Bundle
+public class OpenTracingBundle implements ConfiguredBundle<Configuration>
 {
   private final List<ServerSpanDecorator> serverSpanDecorators;
   private final List<InterceptorSpanDecorator> interceptorSpanDecorators;
@@ -105,7 +106,7 @@ public class OpenTracingBundle implements Bundle
   }
 
   @Override
-  public void run(Environment environment)
+  public void run(Configuration configuration, Environment environment)
   {
     if (GlobalTracer.isRegistered())
     {

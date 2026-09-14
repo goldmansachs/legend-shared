@@ -71,6 +71,11 @@
         </plugins>
     </build>
 
+    <properties>
+        <!-- Dropwizard 3.0 / Jetty 10 are Java 11 artifacts; see ADR-003 in legend-engine. -->
+        <maven.compiler.release>11</maven.compiler.release>
+    </properties>
+
     <dependencies>
         <!-- LEGEND -->
         <dependency>
@@ -133,6 +138,18 @@
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Dropwizard 3.0 dropped the JUnit 4 rules; the bundle tests run on Jupiter, the rest
+             still run on JUnit 4 via the vintage engine. -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.vintage</groupId>
+            <artifactId>junit-vintage-engine</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

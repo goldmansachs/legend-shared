@@ -18,25 +18,30 @@ import java.util.List;
 import org.pac4j.core.client.Client;
 import org.pac4j.core.client.DirectClient;
 import org.pac4j.core.context.WebContext;
-import org.pac4j.core.engine.decision.ProfileStorageDecision;
-import org.pac4j.core.profile.CommonProfile;
 import org.pac4j.core.profile.UserProfile;
 
-public class LegendUserProfileStorageDecision<C extends WebContext> implements ProfileStorageDecision<C>
+/**
+ * Decides whether profiles are read from and written to the session, based on whether every client
+ * in play is annotated {@link SerializableProfile}.
+ *
+ * <p>pac4j 5 removed {@code org.pac4j.core.engine.decision.ProfileStorageDecision} — the security
+ * logic now reads a {@code loadProfilesFromSession} flag and asks each {@link DirectClient} whether
+ * to save. This class is no longer a pac4j SPI implementation; it is a plain helper that
+ * {@link LegendSecurityLogic} consults so the annotation-driven behaviour is preserved.
+ */
+public class LegendUserProfileStorageDecision
 {
 
   public LegendUserProfileStorageDecision()
   {
   }
 
-  @Override
-  public boolean mustLoadProfilesFromSession(C context, List<Client> currentClients)
+  public boolean mustLoadProfilesFromSession(WebContext context, List<Client> currentClients)
   {
     return checkForSerializableAnnotation(currentClients);
   }
 
-  @Override
-  public boolean mustSaveProfileInSession(C context, List<Client> currentClients, DirectClient directClient, UserProfile userProfile)
+  public boolean mustSaveProfileInSession(WebContext context, List<Client> currentClients, DirectClient directClient, UserProfile userProfile)
   {
     return checkForSerializableAnnotation(currentClients);
   }

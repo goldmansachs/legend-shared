@@ -23,8 +23,8 @@ import org.finos.legend.server.pac4j.sessionutil.UuidUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.pac4j.core.context.JEEContext;
-import org.pac4j.core.context.session.JEESessionStore;
+import org.pac4j.jee.context.JEEContext;
+import org.pac4j.jee.context.session.JEESessionStore;
 import org.pac4j.jax.rs.pac4j.JaxRsContext;
 import org.pac4j.jax.rs.servlet.pac4j.ServletSessionStore;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -60,7 +60,7 @@ public class HazelcastSessionStoreTest
     public void before()
     {
         store = new HazelcastSessionStore(HAZELCAST_CONFIG_FILE_PATH, ImmutableMap.of(
-                JEEContext.class, new JEESessionStore(), JaxRsContext.class, new ServletSessionStore()), SSO_COOKIE_NAME);
+                JEEContext.class, JEESessionStore.INSTANCE, JaxRsContext.class, ServletSessionStore.INSTANCE), SSO_COOKIE_NAME);
     }
 
     @After
@@ -95,7 +95,7 @@ public class HazelcastSessionStoreTest
         JEEContext nodeAContext = new JEEContext(nodeARequest, nodeAResponse);
         store.set(nodeAContext, "userProfiles", "alice-profile");
 
-        Cookie ssoCookie = findSsoCookie(nodeAResponse.getCookies());
+        Cookie ssoCookie = findSsoCookie(SessionStoreTestUtil.responseCookies(nodeAResponse));
         assertNotNull(ssoCookie);
         UUID sessionId = sessionIdFromCookie(ssoCookie);
 
@@ -106,7 +106,7 @@ public class HazelcastSessionStoreTest
         assertFalse(imap.containsKey(sessionId));
 
         MockHttpServletRequest nodeBRequest = new MockHttpServletRequest();
-        nodeBRequest.setCookies(nodeAResponse.getCookies());
+        nodeBRequest.setCookies(SessionStoreTestUtil.responseCookies(nodeAResponse));
         MockHttpServletResponse nodeBResponse = new MockHttpServletResponse();
         JEEContext nodeBContext = new JEEContext(nodeBRequest, nodeBResponse);
 
@@ -125,14 +125,14 @@ public class HazelcastSessionStoreTest
         JEEContext nodeAContext = new JEEContext(nodeARequest, nodeAResponse);
         store.set(nodeAContext, "userProfiles", "alice-profile");
 
-        UUID sessionId = sessionIdFromCookie(findSsoCookie(nodeAResponse.getCookies()));
+        UUID sessionId = sessionIdFromCookie(findSsoCookie(SessionStoreTestUtil.responseCookies(nodeAResponse)));
         IMap<UUID, Map<String, Object>> imap = hazelcastImap();
 
         imap.evict(sessionId);
         assertFalse(imap.containsKey(sessionId));
 
         MockHttpServletRequest nodeBRequest = new MockHttpServletRequest();
-        nodeBRequest.setCookies(nodeAResponse.getCookies());
+        nodeBRequest.setCookies(SessionStoreTestUtil.responseCookies(nodeAResponse));
         MockHttpServletResponse nodeBResponse = new MockHttpServletResponse();
         JEEContext nodeBContext = new JEEContext(nodeBRequest, nodeBResponse);
         store.set(nodeBContext, "csrfToken", "node-b-token");
@@ -141,7 +141,7 @@ public class HazelcastSessionStoreTest
         assertEquals("node-b-token", imap.get(sessionId).get("csrfToken"));
 
         MockHttpServletRequest nodeCRequest = new MockHttpServletRequest();
-        nodeCRequest.setCookies(nodeAResponse.getCookies());
+        nodeCRequest.setCookies(SessionStoreTestUtil.responseCookies(nodeAResponse));
         JEEContext nodeCContext = new JEEContext(nodeCRequest, new MockHttpServletResponse());
         assertEquals("node-b-token", store.get(nodeCContext, "csrfToken").orElse(null));
     }
@@ -154,25 +154,25 @@ public class HazelcastSessionStoreTest
         JEEContext loginCtx = new JEEContext(loginReq, loginResp);
         store.set(loginCtx, "userProfiles", "alice-profile");
 
-        Cookie originalCookie = findSsoCookie(loginResp.getCookies());
+        Cookie originalCookie = findSsoCookie(SessionStoreTestUtil.responseCookies(loginResp));
         UUID sessionId = sessionIdFromCookie(originalCookie);
         IMap<UUID, Map<String, Object>> imap = hazelcastImap();
 
         imap.evict(sessionId);
 
         MockHttpServletRequest protectedReq = new MockHttpServletRequest();
-        protectedReq.setCookies(loginResp.getCookies());
+        protectedReq.setCookies(SessionStoreTestUtil.responseCookies(loginResp));
         MockHttpServletResponse protectedResp = new MockHttpServletResponse();
         JEEContext protectedCtx = new JEEContext(protectedReq, protectedResp);
         assertFalse(store.get(protectedCtx, "userProfiles").isPresent());
 
         MockHttpServletRequest callbackReq = new MockHttpServletRequest();
-        callbackReq.setCookies(loginResp.getCookies());
+        callbackReq.setCookies(SessionStoreTestUtil.responseCookies(loginResp));
         MockHttpServletResponse callbackResp = new MockHttpServletResponse();
         JEEContext callbackCtx = new JEEContext(callbackReq, callbackResp);
         store.set(callbackCtx, "userProfiles", "alice-profile-after-reauth");
 
-        Cookie cookieAfterCallback = findSsoCookie(callbackResp.getCookies());
+        Cookie cookieAfterCallback = findSsoCookie(SessionStoreTestUtil.responseCookies(callbackResp));
         if (cookieAfterCallback != null)
         {
             assertEquals(sessionId, sessionIdFromCookie(cookieAfterCallback));
@@ -180,7 +180,7 @@ public class HazelcastSessionStoreTest
         assertEquals("alice-profile-after-reauth", imap.get(sessionId).get("userProfiles"));
 
         MockHttpServletRequest afterReq = new MockHttpServletRequest();
-        afterReq.setCookies(loginResp.getCookies());
+        afterReq.setCookies(SessionStoreTestUtil.responseCookies(loginResp));
         JEEContext afterCtx = new JEEContext(afterReq, new MockHttpServletResponse());
         assertEquals("alice-profile-after-reauth", store.get(afterCtx, "userProfiles").orElse(null));
     }
@@ -194,7 +194,7 @@ public class HazelcastSessionStoreTest
 
         store.set(ctx, "userProfiles", "alice-profile");
 
-        Cookie cookie = findSsoCookie(resp.getCookies());
+        Cookie cookie = findSsoCookie(SessionStoreTestUtil.responseCookies(resp));
         assertNotNull(cookie);
         UUID sessionId = sessionIdFromCookie(cookie);
 
@@ -210,14 +210,14 @@ public class HazelcastSessionStoreTest
         MockHttpServletResponse origResp = new MockHttpServletResponse();
         JEEContext origCtx = new JEEContext(origReq, origResp);
         store.set(origCtx, "userProfiles", "alice-profile");
-        UUID oldSessionId = sessionIdFromCookie(findSsoCookie(origResp.getCookies()));
+        UUID oldSessionId = sessionIdFromCookie(findSsoCookie(SessionStoreTestUtil.responseCookies(origResp)));
 
         MockHttpServletRequest freshReq = new MockHttpServletRequest();
         MockHttpServletResponse freshResp = new MockHttpServletResponse();
         JEEContext freshCtx = new JEEContext(freshReq, freshResp);
         store.set(freshCtx, "userProfiles", "alice-after-cookie-clear");
 
-        UUID newSessionId = sessionIdFromCookie(findSsoCookie(freshResp.getCookies()));
+        UUID newSessionId = sessionIdFromCookie(findSsoCookie(SessionStoreTestUtil.responseCookies(freshResp)));
         assertNotEquals(oldSessionId, newSessionId);
 
         IMap<UUID, Map<String, Object>> imap = hazelcastImap();
@@ -233,7 +233,7 @@ public class HazelcastSessionStoreTest
         JEEContext loginCtx = new JEEContext(loginReq, loginResp);
         store.set(loginCtx, "seed", "seed");
 
-        Cookie[] cookies = loginResp.getCookies();
+        Cookie[] cookies = SessionStoreTestUtil.responseCookies(loginResp);
         UUID sessionId = sessionIdFromCookie(findSsoCookie(cookies));
         IMap<UUID, Map<String, Object>> imap = hazelcastImap();
 

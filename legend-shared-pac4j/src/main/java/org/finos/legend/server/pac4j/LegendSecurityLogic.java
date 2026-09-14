@@ -1,3 +1,17 @@
+// Copyright 2020 Goldman Sachs
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package org.finos.legend.server.pac4j;
 
 import org.pac4j.core.client.Client;
@@ -5,6 +19,7 @@ import org.pac4j.core.client.DirectClient;
 import org.pac4j.core.client.IndirectClient;
 import org.pac4j.core.config.Config;
 import org.pac4j.core.context.WebContext;
+import org.pac4j.core.context.session.SessionStore;
 import org.pac4j.core.credentials.Credentials;
 import org.pac4j.core.engine.DefaultSecurityLogic;
 import org.pac4j.core.engine.SecurityGrantedAccessAdapter;
@@ -24,81 +39,111 @@ import java.util.stream.Collectors;
 
 import static org.finos.legend.server.pac4j.LegendRequestHandler.REDIRECT_PROTO_ATTRIBUTE;
 
-public class LegendSecurityLogic<R, C extends WebContext> extends DefaultSecurityLogic<R, C>
+public class LegendSecurityLogic extends DefaultSecurityLogic
 {
     private static final Logger LOGGER = LoggerFactory.getLogger(LegendSecurityLogic.class);
     public static final String IS_CONSTRAINED_KERBEROS_FLOW = "IS_CONSTRAINED_KERBEROS_FLOW";
 
-    @Override
-    public R perform(C context,
-                     Config config,
-                     SecurityGrantedAccessAdapter<R, C> securityGrantedAccessAdapter,
-                     HttpActionAdapter<R, C> httpActionAdapter,
-                     String clients,
-                     String authorizers,
-                     String matchers,
-                     Boolean inputMultiProfile,
-                     Object... parameters)
+    private LegendUserProfileStorageDecision profileStorageDecision = new LegendUserProfileStorageDecision();
+
+    private boolean multiProfile;
+
+    public LegendUserProfileStorageDecision getProfileStorageDecision()
     {
-        boolean multiProfile = inputMultiProfile != null && inputMultiProfile;
-        if (!multiProfile)
+        return this.profileStorageDecision;
+    }
+
+    public void setProfileStorageDecision(LegendUserProfileStorageDecision profileStorageDecision)
+    {
+        this.profileStorageDecision = profileStorageDecision;
+    }
+
+    public boolean isMultiProfile()
+    {
+        return this.multiProfile;
+    }
+
+    /**
+     * pac4j 5 dropped the {@code inputMultiProfile} argument from {@link
+     * org.pac4j.core.engine.SecurityLogic#perform}; it is now sourced from the client. The bundle
+     * still configures it once for the whole application, so it is carried here.
+     */
+    public void setMultiProfile(boolean multiProfile)
+    {
+        this.multiProfile = multiProfile;
+    }
+
+    @Override
+    public Object perform(WebContext context,
+                          SessionStore sessionStore,
+                          Config config,
+                          SecurityGrantedAccessAdapter securityGrantedAccessAdapter,
+                          HttpActionAdapter httpActionAdapter,
+                          String clients,
+                          String authorizers,
+                          String matchers,
+                          Object... parameters)
+    {
+        if (!this.multiProfile)
         {
             LOGGER.debug("MultiProfile turned off falling back to default handling");
-            return callParentPerform(context, config, securityGrantedAccessAdapter, httpActionAdapter, clients, authorizers, matchers, inputMultiProfile, parameters);
+            return callParentPerform(context, sessionStore, config, securityGrantedAccessAdapter, httpActionAdapter, clients, authorizers, matchers, parameters);
         }
         if (nonBrowserCall(context))
         {
             LOGGER.debug("Non-browser call detected, falling back to default handling");
-            return callParentPerform(context, config, securityGrantedAccessAdapter, httpActionAdapter, clients, CommonHelper.isBlank(authorizers) ? "none" : authorizers, matchers, false, parameters);
+            return callParentPerform(context, sessionStore, config, securityGrantedAccessAdapter, httpActionAdapter, clients, CommonHelper.isBlank(authorizers) ? "none" : authorizers, matchers, parameters);
         }
         LOGGER.debug("Browser call detected, using LegendSecurityLogic handling");
         LOGGER.debug("url: {}", context.getFullRequestURL());
         LOGGER.debug("clients: {}", clients);
         try
         {
-            List<Client<? extends Credentials>> inputClients = getClientFinder().find(config.getClients(), context, clients);
+            List<Client> inputClients = getClientFinder().find(config.getClients(), context, clients);
             LOGGER.debug("inputClients: {}", inputClients);
-            if (!this.getMatchingChecker().matches(context, matchers, config.getMatchers(), inputClients))
+            if (!this.getMatchingChecker().matches(context, sessionStore, matchers, config.getMatchers(), inputClients))
             {
                 LOGGER.debug("no matching for this request -> grant access");
-                return securityGrantedAccessAdapter.adapt(context, Collections.emptyList(), parameters);
+                return securityGrantedAccessAdapter.adapt(context, sessionStore, Collections.emptyList(), parameters);
             }
 
             boolean loadProfilesFromSession = getProfileStorageDecision().mustLoadProfilesFromSession(context, inputClients);
             LOGGER.debug("loadProfilesFromSession: {}", loadProfilesFromSession);
             context.setRequestAttribute("pac4jLoadProfilesFromSession", loadProfilesFromSession);
-            ProfileManager<UserProfile> manager = this.getProfileManager(context);
+            ProfileManager manager = this.getProfileManager(context, sessionStore);
             manager.setConfig(config);
-            List<UserProfile> profiles = manager.getAll(loadProfilesFromSession);
+            // pac4j 4 passed the flag into getAll(); pac4j 5's ProfileManager has no such argument, so
+            // the profiles are always read and the flag only drives the save decision below.
+            List<UserProfile> profiles = manager.getProfiles();
             LOGGER.debug("existing profiles: {}", profiles);
 
             for (Client currentClient : inputClients)
             {
-                if (isValidProfilePresent(profiles,currentClient))
+                if (isValidProfilePresent(profiles, currentClient))
                 {
                     LOGGER.debug("Valid profile found skipping new profile creation for client : {}", currentClient);
                     continue;
                 }
                 if (currentClient instanceof IndirectClient)
                 {
-                    return handleIndirectClient(context, config, httpActionAdapter,(IndirectClient<? extends Credentials>) currentClient, inputClients);
+                    return handleIndirectClient(context, sessionStore, config, httpActionAdapter, (IndirectClient) currentClient, inputClients);
                 }
-                Optional<Credentials> credentials = currentClient.getCredentials(context);
+                Optional<Credentials> credentials = currentClient.getCredentials(context, sessionStore);
                 LOGGER.debug("credentials: {}", credentials);
                 if (!credentials.isPresent())
                 {
                     LOGGER.debug("unauthorized");
-                    return httpActionAdapter.adapt(this.unauthorized(context, inputClients), context);
+                    return httpActionAdapter.adapt(this.unauthorized(context, sessionStore, inputClients), context);
                 }
-                Optional<UserProfile> profile = currentClient.getUserProfile(credentials.get(), context);
+                Optional<UserProfile> profile = currentClient.getUserProfile(credentials.get(), context, sessionStore);
                 if (profile.isPresent())
                 {
                     LOGGER.debug("profile created. Saving profile for client: {}", currentClient);
-                    boolean saveProfileInSession = getProfileStorageDecision().mustSaveProfileInSession(context, inputClients, (DirectClient)currentClient, profile.get());
-                    manager.save(saveProfileInSession, profile.get(), multiProfile);
+                    boolean saveProfileInSession = getProfileStorageDecision().mustSaveProfileInSession(context, inputClients, (DirectClient) currentClient, profile.get());
+                    manager.save(saveProfileInSession, profile.get(), true);
                 }
             }
-            return callParentPerform(context, config, securityGrantedAccessAdapter, httpActionAdapter, clients, CommonHelper.isBlank(authorizers) ? "none" : authorizers, matchers, inputMultiProfile, parameters);
+            return callParentPerform(context, sessionStore, config, securityGrantedAccessAdapter, httpActionAdapter, clients, CommonHelper.isBlank(authorizers) ? "none" : authorizers, matchers, parameters);
         } catch (Exception e)
         {
             LOGGER.error("An error occurred during security logic processing", e);
@@ -106,42 +151,42 @@ public class LegendSecurityLogic<R, C extends WebContext> extends DefaultSecurit
         }
     }
 
-    private R handleIndirectClient(C context, Config config, HttpActionAdapter<R, C> httpActionAdapter, IndirectClient<? extends Credentials> oidcClient, List<Client<? extends Credentials>> currentClients)
+    private Object handleIndirectClient(WebContext context, SessionStore sessionStore, Config config, HttpActionAdapter httpActionAdapter, IndirectClient oidcClient, List<Client> currentClients)
     {
         LOGGER.debug("redirecting to indirect client: {}", oidcClient.getName());
-        context.setRequestAttribute(REDIRECT_PROTO_ATTRIBUTE,oidcClient.getUrlResolver().compute(oidcClient.getCallbackUrl(),context).startsWith("https") ? "https" : "http");
+        context.setRequestAttribute(REDIRECT_PROTO_ATTRIBUTE, oidcClient.getUrlResolver().compute(oidcClient.getCallbackUrl(), context).startsWith("https") ? "https" : "http");
         this.setSavedRequestHandler(new LegendRequestHandler());
-        this.saveRequestedUrl(context, currentClients, config.getClients().getAjaxRequestResolver());
-        HttpAction action = this.redirectToIdentityProvider(context, Collections.singletonList(oidcClient));
+        this.saveRequestedUrl(context, sessionStore, currentClients, config.getClients().getAjaxRequestResolver());
+        HttpAction action = this.redirectToIdentityProvider(context, sessionStore, Collections.singletonList(oidcClient));
         return httpActionAdapter.adapt(action, context);
     }
 
-    private boolean isValidProfilePresent(List<UserProfile> profiles, Client<? extends Credentials> client)
+    private boolean isValidProfilePresent(List<UserProfile> profiles, Client client)
     {
         return profiles.stream().anyMatch(userProfile -> userProfile.getClientName().equals(client.getName()) && !userProfile.isExpired());
     }
 
-    R callParentPerform(C context, Config config, SecurityGrantedAccessAdapter<R, C> securityGrantedAccessAdapter, HttpActionAdapter<R, C> httpActionAdapter, String clients, String authorizers, String matchers, Boolean inputMultiProfile, Object[] parameters)
+    Object callParentPerform(WebContext context, SessionStore sessionStore, Config config, SecurityGrantedAccessAdapter securityGrantedAccessAdapter, HttpActionAdapter httpActionAdapter, String clients, String authorizers, String matchers, Object[] parameters)
     {
         Set<String> requested = getClientFinder().find(config.getClients(), context, clients).stream()
                 .map(Client::getName)
                 .collect(Collectors.toSet());
 
-        ProfileManager<UserProfile> manager = getProfileManager(context);
+        ProfileManager manager = getProfileManager(context, sessionStore);
         manager.setConfig(config);
-        boolean hasStaleProfile = manager.getAll(true).stream()
+        boolean hasStaleProfile = manager.getProfiles().stream()
                 .anyMatch(p -> !requested.contains(p.getClientName()));
         if (hasStaleProfile)
         {
             LOGGER.debug("Session contains profiles outside requested clients {} -> clearing session", requested);
-            manager.remove(true);
+            manager.removeProfiles();
         }
         LOGGER.debug("Calling parent perform method");
-        return super.perform(context, config, securityGrantedAccessAdapter,
-                httpActionAdapter, clients, authorizers, matchers, inputMultiProfile, parameters);
+        return super.perform(context, sessionStore, config, securityGrantedAccessAdapter,
+                httpActionAdapter, clients, authorizers, matchers, parameters);
     }
 
-    private boolean nonBrowserCall(C context)
+    private boolean nonBrowserCall(WebContext context)
     {
         Optional<String> userAgent = context.getRequestHeader("User-Agent");
         if (userAgent.isPresent())

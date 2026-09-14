@@ -27,8 +27,8 @@ import org.ietf.jgss.GSSException;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.pac4j.core.context.JEEContext;
-import org.pac4j.core.context.session.JEESessionStore;
+import org.pac4j.jee.context.JEEContext;
+import org.pac4j.jee.context.session.JEESessionStore;
 import org.pac4j.core.util.Pac4jConstants;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -54,6 +54,31 @@ import static org.mockito.Mockito.when;
 
 public class KerberosProfileTest
 {
+
+    /**
+     * pac4j 5's JEEContext.addResponseCookie writes a raw Set-Cookie header instead of calling
+     * HttpServletResponse.addCookie, so MockHttpServletResponse.getCookies() no longer sees them.
+     */
+    private static Cookie[] responseCookies(MockHttpServletResponse response)
+    {
+        java.util.List<Cookie> cookies = new java.util.ArrayList<>();
+        for (String header : response.getHeaders("Set-Cookie"))
+        {
+            String[] attributes = header.split(";");
+            String[] nameAndValue = attributes[0].split("=", 2);
+            Cookie cookie = new Cookie(nameAndValue[0].trim(), nameAndValue.length > 1 ? nameAndValue[1].trim() : "");
+            for (int i = 1; i < attributes.length; i++)
+            {
+                String[] attribute = attributes[i].split("=", 2);
+                if ("Max-Age".equalsIgnoreCase(attribute[0].trim()) && attribute.length > 1)
+                {
+                    cookie.setMaxAge(Integer.parseInt(attribute[1].trim()));
+                }
+            }
+            cookies.add(cookie);
+        }
+        return cookies.toArray(new Cookie[0]);
+    }
 
     private static MongoServer server;
     private static MongoClient client;
@@ -182,7 +207,7 @@ public class KerberosProfileTest
                 "AES",
                 3600,
                 db.getCollection("kerberosSessionData"),
-                ImmutableMap.of(JEEContext.class, new JEESessionStore()),
+                ImmutableMap.of(JEEContext.class, JEESessionStore.INSTANCE),
                 trustedPackages,
                 "LegendSSOTest"
         );
@@ -206,7 +231,7 @@ public class KerberosProfileTest
         assertEquals(kerberosProfile.getId(), ((KerberosProfile) retrievedFromSession.get()).getId());
 
         // Extract SSO cookie
-        Cookie[] cookies = response.getCookies();
+        Cookie[] cookies = responseCookies(response);
         assertNotNull(cookies);
         assertTrue(cookies.length > 0);
 
@@ -242,7 +267,7 @@ public class KerberosProfileTest
                 "AES",
                 3600,
                 db.getCollection(SESSION_COLLECTION),
-                ImmutableMap.of(JEEContext.class, new JEESessionStore()),
+                ImmutableMap.of(JEEContext.class, JEESessionStore.INSTANCE),
                 trustedPackages,
                 "LegendSSOTest"
         );
@@ -264,7 +289,7 @@ public class KerberosProfileTest
         assertEquals(kerberosProfile.getId(), ((KerberosProfile) retrievedFromSession.get()).getId());
 
         // Extract SSO cookie
-        Cookie[] cookies = response.getCookies();
+        Cookie[] cookies = responseCookies(response);
         assertNotNull(cookies);
         assertTrue(cookies.length > 0);
 
@@ -306,7 +331,7 @@ public class KerberosProfileTest
         trustedPackages.add("org.pac4j.core.profile");
         trustedPackages.add("org.finos.legend.server.pac4j.kerberos");
 
-        JEESessionStore sessionStore = new JEESessionStore();
+        JEESessionStore sessionStore = JEESessionStore.INSTANCE;
         MongoDbSessionStore kerberosStore = new MongoDbSessionStore(
                 "AES",
                 3600,
@@ -333,7 +358,7 @@ public class KerberosProfileTest
         assertEquals(kerberosProfile.getId(), ((KerberosProfile) retrievedFromSession.get()).getId());
 
         // Extract SSO cookie
-        Cookie[] cookies = response.getCookies();
+        Cookie[] cookies = responseCookies(response);
         assertNotNull(cookies);
         assertTrue(cookies.length > 0);
 

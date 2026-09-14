@@ -16,7 +16,7 @@ package org.finos.legend.server.pac4j;
 
 import org.junit.Test;
 import org.pac4j.core.client.Client;
-import org.pac4j.core.context.JEEContext;
+import org.pac4j.jee.context.JEEContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,7 +29,7 @@ public class LegendUserProfileStorageDecisionTest
     @Test
     public void shouldReturnTrueOnlyIfAllTheClientsAreAnnotatedWithSerializableProfile()
     {
-      LegendUserProfileStorageDecision<JEEContext> decision = new LegendUserProfileStorageDecision<>();
+      LegendUserProfileStorageDecision decision = new LegendUserProfileStorageDecision();
       List<Client> clientList = new ArrayList<>();
       clientList.add(new TestClient());
       assertTrue(decision.mustSaveProfileInSession(null,clientList,null,null));
@@ -38,7 +38,7 @@ public class LegendUserProfileStorageDecisionTest
     @Test
     public void shouldReturnFalseIfAnyOfTheClientsAreNotAnnotatedWithSerializableProfile()
     {
-        LegendUserProfileStorageDecision<JEEContext> decision = new LegendUserProfileStorageDecision<>();
+        LegendUserProfileStorageDecision decision = new LegendUserProfileStorageDecision();
         List<Client> clientList = new ArrayList<>();
         clientList.add(new TestClient());
         clientList.add(new SecondTestClient());
@@ -48,7 +48,7 @@ public class LegendUserProfileStorageDecisionTest
     @Test
     public void shouldReturnTrueOnlyIfAllTheClientsAreAnnotatedWithSerializableProfileForMustLoadProfileFromSession()
     {
-        LegendUserProfileStorageDecision<JEEContext> decision = new LegendUserProfileStorageDecision<>();
+        LegendUserProfileStorageDecision decision = new LegendUserProfileStorageDecision();
         List<Client> clientList = new ArrayList<>();
         clientList.add(new TestClient());
         assertTrue(decision.mustLoadProfilesFromSession(null,clientList));
@@ -57,7 +57,7 @@ public class LegendUserProfileStorageDecisionTest
     @Test
     public void shouldReturnFalseIfAnyOfTheClientsAreNotAnnotatedWithSerializableProfileForMustLoadProfileFromSession()
     {
-        LegendUserProfileStorageDecision<JEEContext> decision = new LegendUserProfileStorageDecision<>();
+        LegendUserProfileStorageDecision decision = new LegendUserProfileStorageDecision();
         List<Client> clientList = new ArrayList<>();
         clientList.add(new TestClient());
         clientList.add(new SecondTestClient());

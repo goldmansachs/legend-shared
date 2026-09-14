@@ -24,7 +24,7 @@ import org.ietf.jgss.Oid;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.MockedStatic;
-import org.pac4j.core.context.JEEContext;
+import org.pac4j.jee.context.JEEContext;
 import org.pac4j.core.context.WebContext;
 import org.pac4j.kerberos.credentials.KerberosCredentials;
 
@@ -89,7 +89,7 @@ public class UnconstraintKerberosAuthenticatorTest
 
             byte[] spnegoToken = new byte[] {1, 2, 3};
             KerberosCredentials credentials = new KerberosCredentials(spnegoToken);
-            delegationKerberosAuth.validate(credentials, mokcedWebContext);
+            delegationKerberosAuth.validate(credentials, mokcedWebContext, null);
 
             assertNotNull(credentials.getUserProfile());
             assertTrue(credentials.getUserProfile() instanceof KerberosProfile);
@@ -138,7 +138,7 @@ public class UnconstraintKerberosAuthenticatorTest
             byte[] spnegoToken = new byte[] {1, 2, 3};
             KerberosCredentials credentials = new KerberosCredentials(spnegoToken);
             TemporaryRedirectAction exception = assertThrows(TemporaryRedirectAction.class,
-                    () -> delegationKerberosAuth.validate(credentials, mokcedWebContext));
+                    () -> delegationKerberosAuth.validate(credentials, mokcedWebContext, null));
 
             assertEquals(307, exception.getCode());
             assertEquals("https://test.service.com/path?query=value", exception.getLocation());

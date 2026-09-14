@@ -30,8 +30,8 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import org.pac4j.core.context.JEEContext;
-import org.pac4j.core.context.session.JEESessionStore;
+import org.pac4j.jee.context.JEEContext;
+import org.pac4j.jee.context.session.JEESessionStore;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -70,7 +70,7 @@ public class MongoDbSessionStoreTest
     {
         List<String> testTrustedPackages = new ArrayList<>();
         testTrustedPackages.add("test.trusted.package");
-        store = new MongoDbSessionStore("AES", 100, db.getCollection(SESSION_COLLECTION), ImmutableMap.of(JEEContext.class, new JEESessionStore()), testTrustedPackages, "LegendSSOTest");
+        store = new MongoDbSessionStore("AES", 100, db.getCollection(SESSION_COLLECTION), ImmutableMap.of(JEEContext.class, JEESessionStore.INSTANCE), testTrustedPackages, "LegendSSOTest");
     }
 
     public void emptySessionData()
@@ -124,7 +124,7 @@ public class MongoDbSessionStoreTest
         store.set(requestContext, "testKey", "testValue");
 
         assertEquals("testValue", store.get(requestContext, "testKey").get());
-        Cookie[] initialResponseCookies = response.getCookies();
+        Cookie[] initialResponseCookies = SessionStoreTestUtil.responseCookies(response);
         // Copy the SSO cookie to the new request but not the underlying j2ESession.
         // The cookie alone should be able to manage sessions in case of non-browser clients
         MockHttpServletRequest newRequest = new MockHttpServletRequest();
@@ -134,7 +134,7 @@ public class MongoDbSessionStoreTest
         requestContext = new JEEContext(newRequest, newResponse);
 
         assertEquals("testValue", store.get(requestContext, "testKey").get()); //should be able to retrieve value
-        Cookie[] secondaryResponseCookies = newResponse.getCookies();
+        Cookie[] secondaryResponseCookies = SessionStoreTestUtil.responseCookies(newResponse);
         assertEquals(secondaryResponseCookies.length, 0);
     }
 
@@ -147,7 +147,7 @@ public class MongoDbSessionStoreTest
         store.set(requestContext, "testKey", "testValue");
 
         assertEquals("testValue", store.get(requestContext, "testKey").get());
-        Cookie[] initialResponseCookies = response.getCookies();
+        Cookie[] initialResponseCookies = SessionStoreTestUtil.responseCookies(response);
         //delete all session data: simulates expiry of stored sessions.
         this.emptySessionData();
         // Copy the SSO cookie to the new request but not the underlying j2ESession: simulates usage of SSO cookie from client
@@ -157,7 +157,7 @@ public class MongoDbSessionStoreTest
         requestContext = new JEEContext(newRequest, newResponse);
 
         assertFalse(store.get(requestContext, "testKey").isPresent());
-        Cookie[] secondaryResponseCookies = newResponse.getCookies();
+        Cookie[] secondaryResponseCookies = SessionStoreTestUtil.responseCookies(newResponse);
         assertEquals(secondaryResponseCookies.length, initialResponseCookies.length);
         assertEquals(secondaryResponseCookies[0].getValue(), initialResponseCookies[0].getValue());
         assertNotEquals(secondaryResponseCookies[0].getMaxAge(), initialResponseCookies[0].getMaxAge());
